@@ -4,6 +4,10 @@ use fluent_bundle::FluentBundle;
 use fluent_bundle::FluentResource;
 use fluent_bundle::FluentValue;
 use fluent_bundle::Memoizer;
+use intl_memoizer::IntlLangMemoizer;
+use std::borrow::Cow;
+use std::cell::RefCell;
+use std::sync::Mutex;
 use unic_langid::langid;
 
 #[test]
@@ -23,8 +27,11 @@ fn fluent_custom_type() {
         fn duplicate(&self) -> Box<dyn FluentType> {
             Box::new(DateTime { epoch: self.epoch })
         }
-        fn as_string(&self, _intls: &dyn Memoizer) -> std::borrow::Cow<'static, str> {
-            format!("{}", self.epoch).into()
+        fn as_string(&self, _: &RefCell<IntlLangMemoizer>) -> Cow<'static, str> {
+            format!("2020-01-20 {}:00", self.epoch).into()
+        }
+        fn as_string_threadsafe(&self, _: &Mutex<IntlLangMemoizer>) -> Cow<'static, str> {
+            format!("2020-01-20 {}:00", self.epoch).into()
         }
     }
 
@@ -114,7 +121,10 @@ fn fluent_date_time_builtin() {
         fn duplicate(&self) -> Box<dyn FluentType> {
             Box::new(DateTime::new(self.epoch, DateTimeOptions::default()))
         }
-        fn as_string(&self, _intls: &dyn Memoizer) -> std::borrow::Cow<'static, str> {
+        fn as_string(&self, _: &RefCell<IntlLangMemoizer>) -> Cow<'static, str> {
+            format!("2020-01-20 {}:00", self.epoch).into()
+        }
+        fn as_string_threadsafe(&self, _: &Mutex<IntlLangMemoizer>) -> Cow<'static, str> {
             format!("2020-01-20 {}:00", self.epoch).into()
         }
     }

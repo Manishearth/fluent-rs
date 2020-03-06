@@ -13,8 +13,13 @@ use intl_memoizer::Memoizable;
 use unic_langid::LanguageIdentifier;
 
 use fluent_bundle::types::{FluentType, FluentValue};
-use fluent_bundle::{FluentArgs, FluentBundle, FluentResource};
 use fluent_bundle::Memoizer;
+use fluent_bundle::{FluentArgs, FluentBundle, FluentResource};
+use intl_memoizer::IntlLangMemoizer;
+
+use std::borrow::Cow;
+use std::cell::RefCell;
+use std::sync::Mutex;
 
 // First we're going to define what options our new type is going to accept.
 // For the sake of the example, we're only going to allow two options:
@@ -106,10 +111,20 @@ impl FluentType for DateTime {
     fn duplicate(&self) -> Box<dyn FluentType> {
         Box::new(DateTime::new(self.epoch, DateTimeOptions::default()))
     }
-    fn as_string(&self, intls: &dyn Memoizer) -> std::borrow::Cow<'static, str> {
-        intls.with_try_get::<DateTimeFormatter, _, _>((self.options.clone(), ), |dtf| {
-            dtf.format(self.epoch).into()
-        }).expect("Failed to format a date.")
+
+    fn as_string(&self, intls: &RefCell<IntlLangMemoizer>) -> Cow<'static, str> {
+        intls
+            .with_try_get::<DateTimeFormatter, _, _>((self.options.clone(),), |dtf| {
+                dtf.format(self.epoch).into()
+            })
+            .expect("Failed to format a date.")
+    }
+    fn as_string_threadsafe(&self, intls: &Mutex<IntlLangMemoizer>) -> Cow<'static, str> {
+        intls
+            .with_try_get::<DateTimeFormatter, _, _>((self.options.clone(),), |dtf| {
+                dtf.format(self.epoch).into()
+            })
+            .expect("Failed to format a date.")
     }
 }
 

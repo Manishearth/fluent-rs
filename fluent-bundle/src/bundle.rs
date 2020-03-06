@@ -6,12 +6,13 @@
 
 use std::borrow::Borrow;
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::hash_map::{Entry as HashEntry, HashMap};
 use std::default::Default;
-use std::cell::RefCell;
+use std::sync::Mutex;
 
 use fluent_syntax::ast;
-use intl_memoizer::{Memoizable, IntlLangMemoizer};
+use intl_memoizer::{IntlLangMemoizer, Memoizable};
 use unic_langid::LanguageIdentifier;
 
 use crate::entry::Entry;
@@ -19,7 +20,7 @@ use crate::entry::GetEntry;
 use crate::errors::FluentError;
 use crate::resolve::{ResolveValue, Scope};
 use crate::resource::FluentResource;
-use crate::types::FluentValue;
+use crate::types::{FluentType, FluentValue};
 
 /// A single localization unit composed of an identifier,
 /// value, and attributes.
@@ -35,36 +36,66 @@ pub struct FluentMessage<'m> {
 pub type FluentArgs<'args> = HashMap<&'args str, FluentValue<'args>>;
 
 pub trait Memoizer {
-    fn new(lang: LanguageIdentifier) -> Self where Self:Sized;
+    fn new(lang: LanguageIdentifier) -> Self
+    where
+        Self: Sized;
     fn with_try_get<I, R, U>(&self, args: I::Args, cb: U) -> Result<R, ()>
-        where Self:Sized,
-              I: Memoizable + 'static,
-              U: FnOnce(&I) -> R;
+    where
+        Self: Sized,
+        I: Memoizable + 'static,
+        U: FnOnce(&I) -> R;
+
+    fn stringify_value(&self, value: &dyn FluentType) -> std::borrow::Cow<'static, str>;
 }
 
 impl Memoizer for RefCell<IntlLangMemoizer> {
-    fn new(lang: LanguageIdentifier) -> Self where Self: Sized {
+    fn new(lang: LanguageIdentifier) -> Self
+    where
+        Self: Sized,
+    {
         RefCell::new(IntlLangMemoizer::new(lang))
     }
 
     fn with_try_get<I, R, U>(&self, args: I::Args, cb: U) -> Result<R, ()>
-        where Self:Sized,
-              I: Memoizable + 'static,
-              U: FnOnce(&I) -> R {
+    where
+        Self: Sized,
+        I: Memoizable + 'static,
+        U: FnOnce(&I) -> R,
+    {
         match self.borrow_mut().try_get(args) {
-            Ok(memoizable) => {
-                Ok(cb(&memoizable))
-            },
-            Err(_) => {
-                Err(())
-            }
+            Ok(memoizable) => Ok(cb(&memoizable)),
+            Err(_) => Err(()),
         }
     }
+
+    fn stringify_value(&self, value: &dyn FluentType) -> std::borrow::Cow<'static, str> {
+        value.as_string(self)
+    }
 }
-//
-// impl Memoizer for RefCell<IntlLangMemoizer> {};
-//
-// impl Memoizer for Mutex<IntlLangMemoizer> {};
+
+impl Memoizer for Mutex<IntlLangMemoizer> {
+    fn new(lang: LanguageIdentifier) -> Self
+    where
+        Self: Sized,
+    {
+        Mutex::new(IntlLangMemoizer::new(lang))
+    }
+
+    fn with_try_get<I, R, U>(&self, args: I::Args, cb: U) -> Result<R, ()>
+    where
+        Self: Sized,
+        I: Memoizable + 'static,
+        U: FnOnce(&I) -> R,
+    {
+        match self.lock().unwrap().try_get(args) {
+            Ok(memoizable) => Ok(cb(&memoizable)),
+            Err(_) => Err(()),
+        }
+    }
+    fn stringify_value(&self, value: &dyn FluentType) -> std::borrow::Cow<'static, str> {
+        value.as_string_threadsafe(self)
+    }
+}
 
 /// A collection of localization messages for a single locale, which are meant
 /// to be used together in a single view, widget or any other UI abstraction.
@@ -421,10 +452,7 @@ impl<R, M: Memoizer> FluentBundleBase<R, M> {
     ///
     /// It's particularly useful for plugging in an external
     /// formatter for `FluentValue::Number`.
-    pub fn set_formatter(
-        &mut self,
-        func: Option<fn(&FluentValue, &M) -> Option<String>>,
-    ) {
+    pub fn set_formatter(&mut self, func: Option<fn(&FluentValue, &M) -> Option<String>>) {
         if let Some(f) = func {
             self.formatter = Some(f);
         } else {

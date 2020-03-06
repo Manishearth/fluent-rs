@@ -12,12 +12,12 @@ use std::fmt::Write;
 use fluent_syntax::ast;
 use fluent_syntax::unicode::unescape_unicode;
 
+use crate::bundle::Memoizer;
 use crate::bundle::{FluentArgs, FluentBundleBase};
 use crate::entry::GetEntry;
 use crate::resource::FluentResource;
 use crate::types::DisplayableNode;
 use crate::types::FluentValue;
-use crate::bundle::Memoizer;
 
 const MAX_PLACEABLES: u8 = 100;
 
@@ -114,13 +114,19 @@ where
 
 // Converts an AST node to a `FluentValue`.
 pub trait ResolveValue<'source> {
-    fn resolve<R, M: Memoizer>(&'source self, scope: &mut Scope<'source, R, M>) -> FluentValue<'source>
+    fn resolve<R, M: Memoizer>(
+        &'source self,
+        scope: &mut Scope<'source, R, M>,
+    ) -> FluentValue<'source>
     where
         R: Borrow<FluentResource>;
 }
 
 impl<'source> ResolveValue<'source> for ast::Pattern<'source> {
-    fn resolve<R, M: Memoizer>(&'source self, scope: &mut Scope<'source, R, M>) -> FluentValue<'source>
+    fn resolve<R, M: Memoizer>(
+        &'source self,
+        scope: &mut Scope<'source, R, M>,
+    ) -> FluentValue<'source>
     where
         R: Borrow<FluentResource>,
     {
@@ -194,7 +200,10 @@ impl<'source> ResolveValue<'source> for ast::Pattern<'source> {
 }
 
 impl<'source> ResolveValue<'source> for ast::Expression<'source> {
-    fn resolve<R, M: Memoizer>(&'source self, scope: &mut Scope<'source, R, M>) -> FluentValue<'source>
+    fn resolve<R, M: Memoizer>(
+        &'source self,
+        scope: &mut Scope<'source, R, M>,
+    ) -> FluentValue<'source>
     where
         R: Borrow<FluentResource>,
     {
@@ -232,7 +241,10 @@ impl<'source> ResolveValue<'source> for ast::Expression<'source> {
 }
 
 impl<'source> ResolveValue<'source> for ast::InlineExpression<'source> {
-    fn resolve<R, M: Memoizer>(&'source self, mut scope: &mut Scope<'source, R, M>) -> FluentValue<'source>
+    fn resolve<R, M: Memoizer>(
+        &'source self,
+        mut scope: &mut Scope<'source, R, M>,
+    ) -> FluentValue<'source>
     where
         R: Borrow<FluentResource>,
     {
